@@ -1,7 +1,7 @@
 import "./App.css";
 import React, { useCallback, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Event, Metadata, Filter } from "./types";
+import { Event, Metadata } from "./types";
 import {
   Avatar,
   Collapse,
@@ -90,21 +90,25 @@ const SingleBlogBox: React.FC<SingleBlogBoxProps> = ({
   );
 };
 
-const filter: Filter = {
-  authors: [
-    "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
-    "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9",
-    "b708f7392f588406212c3882e7b3bc0d9b08d62f95fa170d099127ece2770e5e",
-    "50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63",
-    "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
-    "fa984bd7dbb282f07e16e7ae87b26a2a7b9b90b7246a44771f0cf5ae58018f52",
-  ],
-  kinds: [30023],
-};
+// const filter: Filter = {
+//   authors: [
+//     "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
+//     "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9",
+//     "b708f7392f588406212c3882e7b3bc0d9b08d62f95fa170d099127ece2770e5e",
+//     "50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63",
+//     "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+//     "fa984bd7dbb282f07e16e7ae87b26a2a7b9b90b7246a44771f0cf5ae58018f52",
+//   ],
+//   kinds: [30023],
+// };
 
-const relays = ["wss://relay.primal.net"];
+// const relays = ["wss://relay.primal.net"];
 
-const urlToUse = "https://api.huddlers.dev/cache";
+const cacheId =
+  "7b77238f38a661f30de9584dbbdd4e9144a4bc860151181cc4533fce6de9b565";
+
+const serverUrl = "https://api.huddlers.dev";
+const fetchEndpoint = "/fetch";
 
 const BlogsApp = () => {
   const [loading, setLoading] = useState(true);
@@ -114,20 +118,20 @@ const BlogsApp = () => {
 
   const fetchEvents = useCallback(async () => {
     try {
-      const response = await fetch(urlToUse, {
-        mode: "cors",
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filter,
-          relays,
-        }),
-      });
-      const data = await response.json();
-      if (data.events && Array.isArray(data.events)) {
-        setEvents(data.events);
-        setProfiles(new Map(Object.entries(data.profiles)));
-        return data.events.length;
+      const response = await fetch(
+        `${serverUrl}${fetchEndpoint}?cache_id=${cacheId}`,
+        {
+          mode: "cors",
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      const eventsData = await response.json();
+
+      if (eventsData.events && Array.isArray(eventsData.events)) {
+        setEvents(eventsData.events);
+        setProfiles(new Map(Object.entries(eventsData.profiles)));
+        return eventsData.events.length;
       }
     } catch (err) {
       console.log("Error", err);
@@ -135,24 +139,9 @@ const BlogsApp = () => {
     return 0;
   }, []);
 
-  const runInitialFetches = useCallback(async () => {
-    for (let i = 0; i < 1; i++) {
-      const numOfEvs = await fetchEvents();
-      if (numOfEvs > 0) {
-        break;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 4000));
-    }
-    setLoading(false);
-  }, [fetchEvents, setLoading]);
-
   useEffect(() => {
-    runInitialFetches();
+    fetchEvents().then(() => setLoading(false));
   }, []);
-
-  if (loading) {
-    return <CircularProgress />;
-  }
 
   return (
     <Box
@@ -180,6 +169,7 @@ const BlogsApp = () => {
           />
         );
       })}
+      {loading && <CircularProgress />}
     </Box>
   );
 };
